@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kana Match</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #fefefe; padding: 20px; }
+    h1 { margin-bottom: 20px; }
+    .screen { display: none; }
+    .active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 10px;
+      max-width: 500px;
+      margin: 20px auto;
+    }
+    .card {
+      width: 80px; height: 80px; background: #ccc;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2em; cursor: pointer;
+      border-radius: 10px; user-select: none;
+    }
+    .flipped { background: #fff; }
+    .matched { background: #8bc34a; pointer-events: none; }
+    .card-back { font-weight: bold; color: #444; }
+    .pair-select {
+      display: flex; flex-wrap: wrap;
+      justify-content: center; max-width: 600px; margin: auto;
+    }
+    .pair-select label { margin: 5px 10px; font-size: 1.2em; }
+    button { padding: 10px 20px; font-size: 1.2em; margin: 10px; }
+    #status { font-size: 1.2em; margin-top: 15px; }
+    #result { font-size: 1.4em; color: green; font-weight: bold; margin-top: 20px; }
+  </style>
+</head>
+<body>
+
+  <!-- Start Screen -->
+  <div id="startScreen" class="screen active">
+    <h1>Kana Match</h1>
+    <button onclick="selectRandomPairs(); startGame();">Random</button>
+    <button onclick="showSetting()">Setting</button>
+  </div>
+
+  <!-- Setting Screen -->
+  <div id="settingScreen" class="screen">
+    <h2>Select Pairs (max 10)</h2>
+    <div class="pair-select" id="pairSelect"></div>
+    <p id="selectedCount">Selected: 0 pairs</p>
+    <button onclick="startGame()">Start</button>
+    <button onclick="hideSetting()">Back</button>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="gameScreen" class="screen">
+    <h1>Kana Match</h1>
+    <div id="status">
+      🕒 Time: <span id="timer">0</span> sec　
+      🔁 Attempts: <span id="attempts">0</span>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div id="result"></div>
+    <button onclick="location.reload()">Play Again</button>
+  </div>
+
+  <script>
+    const maxPairs = 10;
+    const kanaRomajiPairs = [
+      ["あ", "A"], ["い", "I"], ["う", "U"], ["え", "E"], ["お", "O"],
+      ["か", "KA"], ["き", "KI"], ["く", "KU"], ["け", "KE"], ["こ", "KO"],
+      ["さ", "SA"], ["し", "SHI"], ["す", "SU"], ["せ", "SE"], ["そ", "SO"],
+      ["た", "TA"], ["ち", "CHI"], ["つ", "TSU"], ["て", "TE"], ["と", "TO"],
+      ["な", "NA"], ["に", "NI"], ["ぬ", "NU"], ["ね", "NE"], ["の", "NO"]
+    ];
+
+    let selectedPairs = [];
+    let timer = 0;
+    let attempts = 0;
+    let intervalId;
+    let matchedCount = 0;
+
+    const pairSelect = document.getElementById("pairSelect");
+    const selectedCount = document.getElementById("selectedCount");
+    const timerDisplay = document.getElementById("timer");
+    const attemptsDisplay = document.getElementById("attempts");
+    const resultDisplay = document.getElementById("result");
+
+    // Setup checkbox options
+    kanaRomajiPairs.forEach(([kana, romaji]) => {
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = kana;
+      checkbox.onchange = () => {
+        if (checkbox.checked) {
+          if (selectedPairs.length >= maxPairs) {
+            checkbox.checked = false;
+            alert("You can select up to 10 pairs.");
+          } else {
+            selectedPairs.push([kana, romaji]);
+          }
+        } else {
+          selectedPairs = selectedPairs.filter(p => p[0] !== kana);
+        }
+        selectedCount.textContent = `Selected: ${selectedPairs.length} pairs`;
+      };
+      label.appendChild(checkbox);
+      label.append(` ${kana} ⇔ ${romaji}`);
+      pairSelect.appendChild(label);
+    });
+
+    function showSetting() {
+      document.getElementById("startScreen").classList.remove("active");
+      document.getElementById("settingScreen").classList.add("active");
+    }
+
+    function hideSetting() {
+      document.getElementById("settingScreen").classList.remove("active");
+      document.getElementById("startScreen").classList.add("active");
+    }
+
+    function selectRandomPairs() {
+      const all = [...kanaRomajiPairs];
+      const shuffled = all.sort(() => Math.random() - 0.5).slice(0, maxPairs);
+      selectedPairs = shuffled;
+      const inputs = pairSelect.querySelectorAll("input");
+      inputs.forEach(input => {
+        input.checked = !!shuffled.find(([kana]) => kana === input.value);
+      });
+      selectedCount.textContent = `Selected: ${selectedPairs.length} pairs`;
+    }
+
+    function startTimer() {
+      intervalId = setInterval(() => {
+        timer++;
+        timerDisplay.textContent = timer;
+      }, 1000);
+    }
+
+    function startGame() {
+      if (selectedPairs.length === 0) {
+        alert("Please select at least one pair via Random or Setting.");
+        return;
+      }
+
+      const cards = selectedPairs.flatMap(([kana, romaji]) => [
+        { text: kana, pairId: kana + romaji },
+        { text: romaji, pairId: kana + romaji }
+      ]).sort(() => Math.random() - 0.5);
+
+      document.getElementById("startScreen").classList.remove("active");
+      document.getElementById("settingScreen").classList.remove("active");
+      document.getElementById("gameScreen").classList.add("active");
+
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      cards.forEach((card, i) => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.dataset.index = i;
+        div.dataset.text = card.text;
+        div.dataset.pairId = card.pairId;
+        div.innerHTML = `<span class="card-back">CHO</span>`;
+        grid.appendChild(div);
+      });
+
+      startTimer();
+      let flipped = [];
+
+      grid.addEventListener("click", e => {
+        const target = e.target.closest(".card");
+        if (!target || target.classList.contains("flipped") || target.classList.contains("matched")) return;
+        if (flipped.length >= 2) return;
+
+        target.textContent = target.dataset.text;
+        target.classList.add("flipped");
+        flipped.push(target);
+
+        if (flipped.length === 2) {
+          attempts++;
+          attemptsDisplay.textContent = attempts;
+          const [a, b] = flipped;
+
+          if (a.dataset.pairId === b.dataset.pairId && a.dataset.index !== b.dataset.index) {
+            a.classList.add("matched");
+            b.classList.add("matched");
+            matchedCount++;
+            flipped = [];
+
+            if (matchedCount === selectedPairs.length) {
+              clearInterval(intervalId);
+              resultDisplay.textContent = `🎉 Cleared in ${timer} seconds with ${attempts} attempts!`;
+            }
+          } else {
+            setTimeout(() => {
+              a.textContent = "CHO";
+              b.textContent = "CHO";
+              a.classList.remove("flipped");
+              b.classList.remove("flipped");
+              a.innerHTML = `<span class="card-back">CHO</span>`;
+              b.innerHTML = `<span class="card-back">CHO</span>`;
+              flipped = [];
+            }, 800);
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
